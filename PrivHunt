@@ -1,0 +1,69 @@
+import sys
+import ecdsa
+
+def private_key_to_public_keys(privkey_hex):
+    privkey = int(privkey_hex, 16)
+    signing_key = ecdsa.SigningKey.from_secret_exponent(privkey, curve=ecdsa.SECP256k1)
+    verifying_key = signing_key.get_verifying_key()
+    pubkey = verifying_key.to_string()
+    
+    compressed_pubkey_02 = bytes.fromhex("02") + pubkey[:32]
+    compressed_pubkey_03 = bytes.fromhex("03") + pubkey[:32]
+        
+    return compressed_pubkey_02.hex(), compressed_pubkey_03.hex()
+
+def main():
+    target_pubkey_hex = input("Target Public Key: ").strip()
+
+    if not (target_pubkey_hex.startswith("02") or target_pubkey_hex.startswith("03")):
+        print("Error: Target Compressed Public Key Must Start With '02' or '03'")
+        return
+
+    end_range = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140
+
+    start_range_hex = input("Starting Private Key Range: ").strip()
+    start_range = int(start_range_hex, 16)
+
+    if start_range < 1:
+        print("Error: Starting Private Key Range must be at least 1.")
+        return
+
+    results = []
+    found = False
+    last_checked_privkey_hex = None
+    
+    try:
+        for i in range(start_range, end_range + 1):
+            privkey_hex = hex(i)[2:].rjust(64, '0')
+            
+            sys.stdout.write(f"\rChecking Private Key: {privkey_hex}")
+            sys.stdout.flush()
+
+            last_checked_privkey_hex = privkey_hex
+
+            pubkey_02_hex, pubkey_03_hex = private_key_to_public_keys(privkey_hex)
+
+            if pubkey_02_hex == target_pubkey_hex or pubkey_03_hex == target_pubkey_hex:
+                found = True
+                break
+
+    except KeyboardInterrupt:
+        print("\nProgram interrupted.")
+        if last_checked_privkey_hex:
+            with open("Last_Checked_PrivKey.txt", "w") as last_checked_file:
+                last_checked_file.write(last_checked_privkey_hex + "\n")
+        return
+
+    if found:
+        print(f"\nPrivate Key Found")
+
+        with open("PrivKey_Found.txt", "a") as output_file:
+            output_file.write(f"{privkey_hex}\n")
+
+        print("Check 'PrivKey_Found.txt' For The Results.")
+
+    else:
+        print("\nNo Private Key Found.")
+
+if __name__ == "__main__":
+    main()
